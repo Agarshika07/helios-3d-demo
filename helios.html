@@ -1,0 +1,1281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>HELIOS — Intelligent Systems for Autonomous Machines</title>
+<style>
+  :root{
+    --bg:#0a0d12;
+    --panel:#0f141b;
+    --panel-border:#1e2a35;
+    --ink:#c9d6de;
+    --ink-dim:#7a8a96;
+    --accent:#4fb7e8;
+    --accent-dim:#2a5a72;
+    --ok:#57c785;
+    --warn:#e0a83c;
+    --bad:#e05c5c;
+    --mono:'IBM Plex Mono','Consolas',monospace;
+    --sans:'IBM Plex Sans','Segoe UI',sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;width:100%;height:100%;background:var(--bg);overflow:hidden;font-family:var(--sans);color:var(--ink);}
+  #scene-container{position:absolute;inset:0;}
+  canvas{display:block;touch-action:none;}
+
+  #hud{position:absolute;inset:0;pointer-events:none;}
+  .panel{pointer-events:auto;background:linear-gradient(180deg,rgba(15,20,27,0.92),rgba(10,13,18,0.92));border:1px solid var(--panel-border);border-radius:3px;backdrop-filter:blur(3px);}
+
+  /* Title */
+  #title-block{position:absolute;top:16px;left:16px;max-width:420px;}
+  #title-block .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:0.12em;color:var(--accent);margin-bottom:2px;}
+  #title-block h1{font-size:20px;margin:0 0 2px 0;font-weight:600;letter-spacing:0.01em;color:#eef4f8;}
+  #title-block p{margin:0;font-size:12px;color:var(--ink-dim);line-height:1.4;}
+
+  /* Mobility panel */
+  #mobility-panel{position:absolute;top:16px;right:16px;width:270px;padding:14px 16px;}
+  #mobility-panel h2{font-size:12px;letter-spacing:0.08em;margin:0 0 10px 0;color:var(--accent);font-weight:600;}
+  .metric-row{display:flex;justify-content:space-between;align-items:baseline;font-family:var(--mono);font-size:12.5px;margin-bottom:7px;color:var(--ink);}
+  .metric-row .label{color:var(--ink-dim);}
+  .metric-row .val{font-weight:600;}
+  #mobility-badge{display:inline-block;margin-top:6px;padding:4px 10px;border-radius:2px;font-family:var(--mono);font-size:11px;letter-spacing:0.08em;font-weight:600;}
+  .badge-NORMAL{background:rgba(87,199,133,0.15);color:var(--ok);border:1px solid rgba(87,199,133,0.4);}
+  .badge-DEGRADED{background:rgba(224,168,60,0.15);color:var(--warn);border:1px solid rgba(224,168,60,0.4);}
+  .badge-STUCK{background:rgba(224,92,92,0.15);color:var(--bad);border:1px solid rgba(224,92,92,0.4);}
+  .badge-HOPPING{background:rgba(79,183,232,0.15);color:var(--accent);border:1px solid rgba(79,183,232,0.4);}
+
+  /* Decision panel */
+  #decision-panel{position:absolute;top:270px;right:16px;width:270px;padding:14px 16px;}
+  #decision-panel h2{font-size:12px;letter-spacing:0.08em;margin:0 0 8px 0;color:var(--accent);font-weight:600;}
+  .action-row{border:1px solid var(--panel-border);border-radius:2px;padding:6px 8px;margin-bottom:6px;font-size:11.5px;}
+  .action-row .aname{font-weight:600;color:var(--ink);}
+  .action-row .aoutcome{color:var(--ink-dim);margin-top:2px;font-size:11px;line-height:1.3;}
+  .action-row.selected{border-color:var(--accent);background:rgba(79,183,232,0.08);}
+  .action-row.selected .aname{color:var(--accent);}
+  #decision-log{margin-top:8px;max-height:120px;overflow-y:auto;font-family:var(--mono);font-size:10.5px;line-height:1.5;color:var(--ink-dim);border-top:1px solid var(--panel-border);padding-top:8px;}
+  #decision-log div{white-space:nowrap;}
+  #decision-log .t{color:var(--accent-dim);}
+
+  /* Sensors panel */
+  #sensors-panel{position:absolute;top:16px;left:16px;margin-top:78px;width:230px;padding:12px 14px;display:none;}
+  #sensors-panel h2{font-size:11px;letter-spacing:0.08em;margin:0 0 8px 0;color:var(--accent);}
+  #sensors-panel .metric-row{font-size:11.5px;margin-bottom:5px;}
+
+  /* Bottom control bar */
+  #controls{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);display:flex;gap:10px;align-items:center;padding:10px 14px;flex-wrap:wrap;justify-content:center;max-width:94vw;}
+  .btn{pointer-events:auto;background:#131a22;border:1px solid var(--panel-border);color:var(--ink);font-family:var(--sans);font-size:12px;padding:7px 13px;border-radius:2px;cursor:pointer;transition:border-color .15s, color .15s;white-space:nowrap;}
+  .btn:hover{border-color:var(--accent);color:#eef4f8;}
+  .btn.active{background:rgba(79,183,232,0.15);border-color:var(--accent);color:var(--accent);}
+  .btn.primary{background:var(--accent);color:#06121a;border-color:var(--accent);font-weight:600;}
+  .btn.primary:hover{opacity:0.9;}
+  .divider{width:1px;height:22px;background:var(--panel-border);}
+
+  /* Terrain select row */
+  #terrain-row{position:absolute;bottom:66px;left:50%;transform:translateX(-50%);display:flex;gap:8px;padding:8px 12px;}
+  .terrain-btn{pointer-events:auto;background:#131a22;border:1px solid var(--panel-border);color:var(--ink-dim);font-family:var(--mono);font-size:10.5px;letter-spacing:0.04em;padding:6px 10px;border-radius:2px;cursor:pointer;}
+  .terrain-btn:hover{color:var(--ink);}
+  .terrain-btn.active{border-color:var(--accent);color:var(--accent);background:rgba(79,183,232,0.1);}
+
+  /* Debug toggles */
+  #debug-panel{position:absolute;bottom:112px;left:16px;padding:10px 12px;display:flex;flex-direction:column;gap:5px;}
+  #debug-panel .dbg-title{font-family:var(--mono);font-size:10px;letter-spacing:0.08em;color:var(--ink-dim);margin-bottom:3px;}
+  .dbg-toggle{pointer-events:auto;display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;color:var(--ink-dim);user-select:none;}
+  .dbg-toggle input{accent-color:var(--accent);}
+  .dbg-toggle.on{color:var(--ink);}
+
+  /* Camera controls */
+  #camera-panel{position:absolute;bottom:112px;right:16px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;align-items:stretch;}
+  #camera-panel .dbg-title{font-family:var(--mono);font-size:10px;letter-spacing:0.08em;color:var(--ink-dim);margin-bottom:2px;}
+  #camera-panel .btn{width:100%;text-align:left;}
+
+  /* Mission strip */
+  #mission-strip{position:absolute;left:16px;top:50%;transform:translateY(-50%);width:150px;padding:10px 12px;display:none;}
+  #mission-strip h2{font-size:10.5px;letter-spacing:0.08em;margin:0 0 6px 0;color:var(--accent);}
+  #mission-strip .mstep{font-family:var(--mono);font-size:10px;color:var(--ink-dim);padding:3px 0 3px 12px;border-left:2px solid var(--panel-border);position:relative;}
+  #mission-strip .mstep.done{color:var(--ok);border-left-color:var(--ok);}
+  #mission-strip .mstep.active{color:var(--accent);border-left-color:var(--accent);}
+
+  /* Tooltip */
+  #component-tip{position:absolute;pointer-events:none;max-width:230px;padding:10px 12px;display:none;z-index:10;}
+  #component-tip .ctitle{font-family:var(--mono);font-size:11px;letter-spacing:0.06em;color:var(--accent);margin-bottom:4px;font-weight:600;}
+  #component-tip .cdesc{font-size:11.5px;line-height:1.4;color:var(--ink);}
+
+  /* Banner */
+  #banner{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);padding:14px 26px;font-family:var(--mono);font-size:15px;letter-spacing:0.1em;font-weight:600;border-radius:3px;display:none;text-align:center;}
+  #banner.show{display:block;}
+  #banner.ok{color:var(--ok);border:1px solid rgba(87,199,133,0.5);background:rgba(10,20,15,0.9);}
+
+  #hint{position:absolute;bottom:150px;left:50%;transform:translateX(-50%);font-family:var(--mono);font-size:10.5px;color:var(--ink-dim);opacity:0.7;text-align:center;}
+
+  ::-webkit-scrollbar{width:5px;}
+  ::-webkit-scrollbar-thumb{background:var(--panel-border);}
+</style>
+</head>
+<body>
+
+<div id="scene-container"></div>
+
+<div id="hud">
+  <div id="title-block">
+    <div class="eyebrow">DIGITAL TWIN — REAL-TIME SIMULATION</div>
+    <h1>HELIOS</h1>
+    <p>Intelligent Systems for Autonomous Machines. Drag to orbit the hopper, scroll to zoom, and click any labelled part to inspect it.</p>
+  </div>
+
+  <div id="mobility-panel" class="panel">
+    <h2>HELIOS MOBILITY STATE</h2>
+    <div class="metric-row"><span class="label">Velocity</span><span class="val" id="m-vel">0.00 m/s</span></div>
+    <div class="metric-row"><span class="label">Wheel Slip</span><span class="val" id="m-slip">0%</span></div>
+    <div class="metric-row"><span class="label">Motor Load</span><span class="val" id="m-load">LOW</span></div>
+    <div class="metric-row"><span class="label">Forward Progress</span><span class="val" id="m-progress">—</span></div>
+    <div class="metric-row"><span class="label">Energy</span><span class="val" id="m-energy">100%</span></div>
+    <div id="mobility-badge" class="badge-NORMAL">MOBILITY: NORMAL</div>
+  </div>
+
+  <div id="decision-panel" class="panel">
+    <h2>DECISION SYSTEM</h2>
+    <div id="actions-list"></div>
+    <div id="decision-log"></div>
+  </div>
+
+  <div id="sensors-panel" class="panel">
+    <h2>RAW SENSORS</h2>
+    <div class="metric-row"><span class="label">Wheel Ω (FL/FR)</span><span class="val" id="s-w1">0 / 0 rad/s</span></div>
+    <div class="metric-row"><span class="label">Wheel Ω (RL/RR)</span><span class="val" id="s-w2">0 / 0 rad/s</span></div>
+    <div class="metric-row"><span class="label">IMU Pitch</span><span class="val" id="s-pitch">0.0°</span></div>
+    <div class="metric-row"><span class="label">IMU Accel Z</span><span class="val" id="s-accel">0.00 g</span></div>
+    <div class="metric-row"><span class="label">Camera</span><span class="val" id="s-cam" style="color:var(--ok)">ACTIVE</span></div>
+    <div class="metric-row"><span class="label">Terrain Zone</span><span class="val" id="s-zone">firm</span></div>
+  </div>
+
+  <div id="mission-strip" class="panel">
+    <h2>MISSION</h2>
+    <div class="mstep active" id="ms-start">START</div>
+    <div class="mstep" id="ms-terrain">DIFFICULT TERRAIN</div>
+    <div class="mstep" id="ms-recovery">RECOVERY</div>
+    <div class="mstep" id="ms-target">TARGET</div>
+  </div>
+
+  <div id="terrain-row" class="panel">
+    <div class="terrain-btn active" data-terrain="normal">NORMAL</div>
+    <div class="terrain-btn" data-terrain="slope">SLOPE</div>
+    <div class="terrain-btn" data-terrain="sand">SOFT SAND</div>
+    <div class="terrain-btn" data-terrain="gravel">GRAVEL</div>
+    <div class="terrain-btn" data-terrain="mixed">MIXED</div>
+  </div>
+
+  <div id="controls" class="panel">
+    <button class="btn primary" id="btn-start">START</button>
+    <button class="btn" id="btn-pause">PAUSE</button>
+    <button class="btn" id="btn-reset">RESET</button>
+    <div class="divider"></div>
+    <button class="btn" id="btn-cam-reset">RESET CAMERA</button>
+  </div>
+
+  <div id="debug-panel" class="panel">
+    <div class="dbg-title">DEBUG OVERLAYS</div>
+    <label class="dbg-toggle"><input type="checkbox" id="dbg-sensors"> Show Sensors</label>
+    <label class="dbg-toggle on"><input type="checkbox" id="dbg-helios" checked> Show HELIOS State</label>
+    <label class="dbg-toggle on"><input type="checkbox" id="dbg-decision" checked> Show Decision System</label>
+    <label class="dbg-toggle"><input type="checkbox" id="dbg-forces"> Show Vehicle Forces</label>
+    <label class="dbg-toggle"><input type="checkbox" id="dbg-slip"> Show Wheel Slip</label>
+  </div>
+
+  <div id="camera-panel" class="panel">
+    <div class="dbg-title">CAMERA VIEWS</div>
+    <button class="btn" data-view="front">FRONT</button>
+    <button class="btn" data-view="rear">REAR</button>
+    <button class="btn" data-view="side">SIDE</button>
+    <button class="btn" data-view="top">TOP</button>
+    <button class="btn" data-view="bottom">BOTTOM</button>
+  </div>
+
+  <div id="hint">drag = orbit &nbsp;·&nbsp; scroll / pinch = zoom &nbsp;·&nbsp; shift+drag / two-finger drag = pan &nbsp;·&nbsp; click a part to inspect it</div>
+
+  <div id="component-tip" class="panel">
+    <div class="ctitle" id="tip-title"></div>
+    <div class="cdesc" id="tip-desc"></div>
+  </div>
+
+  <div id="banner" class="panel"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+"use strict";
+
+/* ============================================================
+   COMPONENT INFO
+   ============================================================ */
+const COMPONENT_INFO = {
+  compute:   {title:"HELIOS COMPUTE", desc:"Onboard compute module running the HELIOS mobility loop: sensor fusion, state estimation and action selection, roughly once per second."},
+  imu:       {title:"IMU", desc:"Inertial measurement unit. Tracks orientation, pitch/roll and acceleration, used to detect slope grade and confirm a stable landing after a hop."},
+  camera:    {title:"PERCEPTION CAMERA", desc:"Forward-facing camera. Monitors the terrain ahead so HELIOS can anticipate soft ground, slopes and obstacles before the wheels reach them."},
+  motor:     {title:"MOTOR ASSEMBLY", desc:"Independent motor driving one wheel. Reports torque and rotation rate back to HELIOS so wheel slip and motor load can be estimated."},
+  encoder:   {title:"WHEEL ENCODER", desc:"Measures wheel rotation rate. Compared against the vehicle's actual ground speed, this is how HELIOS computes wheel slip."},
+  suspension:{title:"SUSPENSION ARM", desc:"Independent suspension linkage. Absorbs terrain impacts, including hop landings, and keeps each wheel loaded against the ground."},
+  battery:   {title:"BATTERY COMPARTMENT", desc:"Primary power source for the drive motors, onboard compute and the hopping mechanism's energy storage."},
+  payload:   {title:"PAYLOAD BAY", desc:"Modular payload bay on the upper deck. Reconfigurable for mission-specific instruments or cargo."},
+  hop:       {title:"HOPPING MECHANISM", desc:"Spring-actuated leg mechanism. Compresses to store mechanical energy, then releases it in a fraction of a second to launch the vehicle over terrain the wheels can't cross."},
+  energy:    {title:"ENERGY STORAGE", desc:"Mechanical energy storage for the hop actuator, visible as a spring stack. Charges between hops and discharges rapidly during launch."},
+  chassis:   {title:"CHASSIS", desc:"Rugged compact chassis. Houses the compute unit, battery and payload bay while protecting them from terrain impacts."}
+};
+
+/* ============================================================
+   THREE.JS SCENE SETUP
+   ============================================================ */
+const container = document.getElementById('scene-container');
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0a0d12);
+scene.fog = new THREE.Fog(0x0a0d12, 30, 90);
+
+const camera = new THREE.PerspectiveCamera(42, window.innerWidth/window.innerHeight, 0.1, 500);
+
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+container.appendChild(renderer.domElement);
+
+// lights
+scene.add(new THREE.HemisphereLight(0x3a5a75, 0x0c0f13, 0.55));
+const sun = new THREE.DirectionalLight(0xdfeeff, 1.15);
+sun.position.set(14, 22, 10);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048,2048);
+sun.shadow.camera.left = -30; sun.shadow.camera.right = 30;
+sun.shadow.camera.top = 30; sun.shadow.camera.bottom = -30;
+sun.shadow.camera.far = 80;
+sun.shadow.bias = -0.0015;
+scene.add(sun);
+const fill = new THREE.PointLight(0x4fb7e8, 0.35, 40);
+fill.position.set(-8,6,-6);
+scene.add(fill);
+
+/* ============================================================
+   MATERIALS
+   ============================================================ */
+const MAT = {
+  chassis: new THREE.MeshStandardMaterial({color:0xb9c2c8, metalness:0.55, roughness:0.4}),
+  chassisDark: new THREE.MeshStandardMaterial({color:0x2b333a, metalness:0.4, roughness:0.55}),
+  accent: new THREE.MeshStandardMaterial({color:0x4fb7e8, metalness:0.3, roughness:0.35, emissive:0x0c3648, emissiveIntensity:0.4}),
+  wheel: new THREE.MeshStandardMaterial({color:0x181b1e, metalness:0.2, roughness:0.85}),
+  hub: new THREE.MeshStandardMaterial({color:0x8a929a, metalness:0.8, roughness:0.3}),
+  glass: new THREE.MeshStandardMaterial({color:0x1c2b33, metalness:0.9, roughness:0.15, emissive:0x0a4a5c, emissiveIntensity:0.5}),
+  spring: new THREE.MeshStandardMaterial({color:0xd7a53a, metalness:0.85, roughness:0.35}),
+  battery: new THREE.MeshStandardMaterial({color:0x2f5c3a, metalness:0.3, roughness:0.5}),
+  label: new THREE.MeshStandardMaterial({color:0x141a20, metalness:0.2, roughness:0.6}),
+  wire: new THREE.MeshStandardMaterial({color:0x111417, metalness:0.1, roughness:0.9})
+};
+
+/* ============================================================
+   VEHICLE CONSTRUCTION
+   ============================================================ */
+const WHEEL_R = 0.34, WHEEL_W = 0.24;
+const vehicle = new THREE.Group();
+const interactiveMeshes = [];
+
+function tag(mesh, id){
+  mesh.userData.componentId = id;
+  mesh.castShadow = true; mesh.receiveShadow = true;
+  interactiveMeshes.push(mesh);
+  return mesh;
+}
+
+// chassis main body
+const chassis = new THREE.Mesh(new THREE.BoxGeometry(1.75, 0.34, 1.0), MAT.chassis);
+chassis.position.y = 0.5;
+tag(chassis, 'chassis');
+vehicle.add(chassis);
+
+// lower belly pan
+const belly = new THREE.Mesh(new THREE.BoxGeometry(1.55, 0.1, 0.88), MAT.chassisDark);
+belly.position.y = 0.30;
+tag(belly, 'chassis');
+vehicle.add(belly);
+
+// compute unit "HELIOS"
+const computeBox = new THREE.Mesh(new THREE.BoxGeometry(0.42,0.16,0.5), MAT.accent);
+computeBox.position.set(0.15, 0.74, 0);
+tag(computeBox, 'compute');
+vehicle.add(computeBox);
+// small raised label plate
+const computeLabel = new THREE.Mesh(new THREE.BoxGeometry(0.3,0.02,0.36), MAT.label);
+computeLabel.position.set(0.15, 0.825, 0);
+tag(computeLabel,'compute');
+vehicle.add(computeLabel);
+
+// IMU
+const imu = new THREE.Mesh(new THREE.BoxGeometry(0.16,0.1,0.16), MAT.hub);
+imu.position.set(-0.35, 0.72, 0.28);
+tag(imu,'imu');
+vehicle.add(imu);
+
+// front perception camera
+const camMount = new THREE.Mesh(new THREE.BoxGeometry(0.12,0.12,0.1), MAT.chassisDark);
+camMount.position.set(0.9, 0.55, 0);
+tag(camMount,'camera');
+vehicle.add(camMount);
+const camLens = new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.06,0.08,16), MAT.glass);
+camLens.rotation.z = Math.PI/2;
+camLens.position.set(0.98, 0.55, 0);
+tag(camLens,'camera');
+vehicle.add(camLens);
+
+// payload bay hatch
+const payload = new THREE.Mesh(new THREE.BoxGeometry(0.65,0.12,0.82), MAT.chassisDark);
+payload.position.set(-0.45, 0.735, 0);
+tag(payload,'payload');
+vehicle.add(payload);
+for(let i=-1;i<=1;i++){
+  const seam = new THREE.Mesh(new THREE.BoxGeometry(0.62,0.005,0.01), MAT.wire);
+  seam.position.set(-0.45, 0.80, i*0.25);
+  vehicle.add(seam);
+}
+
+// battery compartment (rear underside)
+const battery = new THREE.Mesh(new THREE.BoxGeometry(0.5,0.22,0.78), MAT.battery);
+battery.position.set(-0.65, 0.36, 0);
+tag(battery,'battery');
+vehicle.add(battery);
+
+// rear structural frame (motors housing area)
+const rearFrame = new THREE.Mesh(new THREE.BoxGeometry(0.18,0.5,0.95), MAT.chassisDark);
+rearFrame.position.set(-0.92, 0.5, 0);
+tag(rearFrame,'chassis');
+vehicle.add(rearFrame);
+
+// wheels, suspension, motors, encoders — 4 corners
+const wheelGroups = {};
+const corners = [
+  {name:'FL', x: 0.62, z: 0.55},
+  {name:'FR', x: 0.62, z:-0.55},
+  {name:'RL', x:-0.62, z: 0.55},
+  {name:'RR', x:-0.62, z:-0.55}
+];
+corners.forEach(c=>{
+  const suspArm = new THREE.Mesh(new THREE.BoxGeometry(0.32,0.07,0.07), MAT.chassisDark);
+  suspArm.position.set(c.x*0.55, 0.44, c.z*0.72);
+  suspArm.rotation.y = (c.z>0?1:-1)*0.15;
+  tag(suspArm,'suspension');
+  vehicle.add(suspArm);
+
+  const hubGroup = new THREE.Group();
+  hubGroup.position.set(c.x, WHEEL_R, c.z*1.02);
+  vehicle.add(hubGroup);
+
+  const motor = new THREE.Mesh(new THREE.CylinderGeometry(0.13,0.13,0.14,20), MAT.hub);
+  motor.rotation.z = Math.PI/2;
+  motor.position.x = (c.z>0? -0.10 : 0.10);
+  tag(motor,'motor');
+  hubGroup.add(motor);
+
+  const encoder = new THREE.Mesh(new THREE.TorusGeometry(0.09,0.015,8,20), MAT.accent);
+  encoder.rotation.y = Math.PI/2;
+  encoder.position.x = (c.z>0? -0.17 : 0.17);
+  tag(encoder,'encoder');
+  hubGroup.add(encoder);
+
+  const wheelMesh = new THREE.Mesh(new THREE.CylinderGeometry(WHEEL_R, WHEEL_R, WHEEL_W, 24), MAT.wheel.clone());
+  wheelMesh.rotation.z = Math.PI/2;
+  wheelMesh.castShadow = true; wheelMesh.receiveShadow = true;
+  hubGroup.add(wheelMesh);
+  // tread ridges
+  for(let i=0;i<10;i++){
+    const ridge = new THREE.Mesh(new THREE.BoxGeometry(WHEEL_W+0.02,0.04,0.04), MAT.hub);
+    const a = (i/10)*Math.PI*2;
+    ridge.position.set(0, Math.sin(a)*WHEEL_R*0.96, Math.cos(a)*WHEEL_R*0.96);
+    ridge.rotation.x = a;
+    wheelMesh.add(ridge);
+  }
+  wheelGroups[c.name] = {group: hubGroup, mesh: wheelMesh, x:c.x, z:c.z};
+});
+
+// hopping mechanism (rear-center, spring stack + foot)
+const hopGroup = new THREE.Group();
+hopGroup.position.set(-0.15, 0.18, 0);
+vehicle.add(hopGroup);
+const hopBase = new THREE.Mesh(new THREE.BoxGeometry(0.3,0.06,0.3), MAT.chassisDark);
+hopBase.position.y = 0.28;
+tag(hopBase,'hop');
+hopGroup.add(hopBase);
+const hopSpring = new THREE.Mesh(new THREE.CylinderGeometry(0.09,0.09,0.22,12,6,true), MAT.spring);
+hopSpring.position.y = 0.16;
+tag(hopSpring,'energy');
+hopGroup.add(hopSpring);
+// spring coil ridges for visual clarity
+for(let i=0;i<5;i++){
+  const coil = new THREE.Mesh(new THREE.TorusGeometry(0.095,0.012,6,16), MAT.spring);
+  coil.rotation.x = Math.PI/2;
+  coil.position.y = 0.06 + i*0.045;
+  tag(coil,'energy');
+  hopGroup.add(coil);
+}
+const hopFoot = new THREE.Mesh(new THREE.CylinderGeometry(0.13,0.15,0.05,16), MAT.hub);
+hopFoot.position.y = 0.02;
+tag(hopFoot,'hop');
+hopGroup.add(hopFoot);
+
+// a few visible wiring runs for realism
+function addWire(points){
+  const curve = new THREE.CatmullRomCurve3(points);
+  const geo = new THREE.TubeGeometry(curve, 12, 0.012, 6, false);
+  const m = new THREE.Mesh(geo, MAT.wire);
+  vehicle.add(m);
+}
+addWire([new THREE.Vector3(0.15,0.66,0.1), new THREE.Vector3(-0.2,0.5,0.3), new THREE.Vector3(-0.6,0.42,0.3), new THREE.Vector3(-0.65,0.4,0.25)]);
+addWire([new THREE.Vector3(0.15,0.66,-0.1), new THREE.Vector3(0.5,0.5,-0.35), new THREE.Vector3(0.6,0.42,-0.4)]);
+addWire([new THREE.Vector3(-0.2,0.55,0), new THREE.Vector3(-0.15,0.3,0), new THREE.Vector3(-0.15,0.2,0)]);
+
+vehicle.castShadow = true;
+scene.add(vehicle);
+
+// dust burst pool (used for hop launch/landing impact)
+const DUST_ONE = new THREE.Vector3(1,1,1);
+const dustPool = [];
+const dustMat = new THREE.MeshBasicMaterial({color:0xcbb27a, transparent:true, opacity:0, side:THREE.DoubleSide, depthWrite:false});
+for(let i=0;i<14;i++){
+  const d = new THREE.Mesh(new THREE.CircleGeometry(0.16,10), dustMat.clone());
+  d.rotation.x = -Math.PI/2;
+  d.visible = false;
+  d.userData = {active:false, life:0, vel:new THREE.Vector3()};
+  scene.add(d);
+  dustPool.push(d);
+}
+function spawnDust(x,y,z,count){
+  let spawned = 0;
+  for(const d of dustPool){
+    if(spawned>=count) break;
+    if(d.userData.active) continue;
+    d.visible = true;
+    d.userData.active = true;
+    d.userData.life = 0.55 + Math.random()*0.2;
+    d.userData.maxLife = d.userData.life;
+    d.position.set(x + (Math.random()-0.5)*0.5, y+0.02, z + (Math.random()-0.5)*0.5);
+    d.scale.setScalar(0.4 + Math.random()*0.5);
+    const ang = Math.random()*Math.PI*2;
+    d.userData.vel.set(Math.cos(ang)*(0.6+Math.random()*0.8), 0, Math.sin(ang)*(0.6+Math.random()*0.8));
+    spawned++;
+  }
+}
+function updateDust(dt){
+  dustPool.forEach(d=>{
+    if(!d.userData.active) return;
+    d.userData.life -= dt;
+    if(d.userData.life<=0){ d.visible=false; d.userData.active=false; return; }
+    d.position.addScaledVector(d.userData.vel, dt);
+    d.scale.multiplyScalar(1+dt*1.8);
+    d.material.opacity = Math.max(0, d.userData.life/d.userData.maxLife) * 0.55;
+  });
+}
+
+// target waypoint flag
+const targetFlagGroup = new THREE.Group();
+const flagPole = new THREE.Mesh(new THREE.CylinderGeometry(0.02,0.02,1.4,8), MAT.hub);
+flagPole.position.y = 0.7;
+targetFlagGroup.add(flagPole);
+const flagCloth = new THREE.Mesh(new THREE.PlaneGeometry(0.42,0.26), new THREE.MeshStandardMaterial({color:0x4fb7e8, side:THREE.DoubleSide, emissive:0x0c3648, emissiveIntensity:0.5}));
+flagCloth.position.set(0.22,1.25,0);
+targetFlagGroup.add(flagCloth);
+const flagRing = new THREE.Mesh(new THREE.RingGeometry(0.5,0.56,32), new THREE.MeshBasicMaterial({color:0x4fb7e8, side:THREE.DoubleSide, transparent:true, opacity:0.5}));
+flagRing.rotation.x = -Math.PI/2;
+flagRing.position.y = 0.02;
+targetFlagGroup.add(flagRing);
+scene.add(targetFlagGroup);
+
+/* ============================================================
+   TERRAIN
+   ============================================================ */
+const TRACK_START = -24;
+let TRACK_TARGET = 24;
+const TRACK_HALF_WIDTH = 5;
+
+const terrainRoot = new THREE.Group();
+scene.add(terrainRoot);
+
+// lab floor beyond the track
+const labFloor = new THREE.Mesh(new THREE.PlaneGeometry(200,200), new THREE.MeshStandardMaterial({color:0x0d1116, roughness:0.95, metalness:0.05}));
+labFloor.rotation.x = -Math.PI/2;
+labFloor.position.y = -0.02;
+labFloor.receiveShadow = true;
+scene.add(labFloor);
+const grid = new THREE.GridHelper(200,80,0x1c2733,0x141b21);
+grid.position.y = -0.015;
+scene.add(grid);
+
+let zones = []; // {type, x0, x1}
+let terrainMeshes = [];
+let gravelBits = [];
+
+function clearTerrainMeshes(){
+  terrainMeshes.forEach(m=>terrainRoot.remove(m));
+  terrainMeshes = [];
+  gravelBits.forEach(m=>terrainRoot.remove(m));
+  gravelBits = [];
+}
+
+const TERRAIN_CONFIGS = {
+  normal: [],
+  slope:  [{type:'slope', x0:-8, x1:2}],
+  sand:   [{type:'sand', x0:-4, x1:6}],
+  gravel: [{type:'gravel', x0:-5, x1:6}],
+  mixed:  [{type:'slope', x0:-18, x1:-10}, {type:'sand', x0:-6, x1:4}, {type:'gravel', x0:8, x1:17}]
+};
+
+function slopeHeightAt(x, z0, z1){
+  // rises then plateaus then descends — smooth hill across zone
+  const t = (x - z0) / (z1 - z0);
+  if(t < 0.5){
+    const u = t/0.5;
+    return 1.6 * (u*u*(3-2*u));
+  } else {
+    const u = (t-0.5)/0.5;
+    return 1.6 * (1 - u*u*(3-2*u))*0.55 + 1.6*0.45; // gentle descend to a plateau remainder
+  }
+}
+
+function getZoneAt(x){
+  for(const z of zones){ if(x>=z.x0 && x<=z.x1) return z; }
+  return {type:'firm', x0:x-1, x1:x+1};
+}
+
+function terrainHeightAt(x){
+  const z = getZoneAt(x);
+  if(z.type==='slope') return slopeHeightAt(x, z.x0, z.x1);
+  return 0;
+}
+
+function buildTerrain(mode){
+  clearTerrainMeshes();
+  zones = (TERRAIN_CONFIGS[mode] || []).map(z=>({...z}));
+  TRACK_TARGET = mode==='mixed' ? 24 : 22;
+
+  // firm base strip across entire track
+  const baseGeo = new THREE.PlaneGeometry(TRACK_TARGET-TRACK_START+16, TRACK_HALF_WIDTH*2, 40, 4);
+  const baseMat = new THREE.MeshStandardMaterial({color:0x3a4048, roughness:0.9, metalness:0.05});
+  const base = new THREE.Mesh(baseGeo, baseMat);
+  base.rotation.x = -Math.PI/2;
+  base.position.set((TRACK_START+TRACK_TARGET)/2, -0.005, 0);
+  base.receiveShadow = true;
+  terrainRoot.add(base); terrainMeshes.push(base);
+
+  zones.forEach(z=>{
+    const w = z.x1 - z.x0;
+    if(z.type==='slope'){
+      const segs = 24;
+      const geo = new THREE.PlaneGeometry(w, TRACK_HALF_WIDTH*2, segs, 2);
+      const pos = geo.attributes.position;
+      for(let i=0;i<pos.count;i++){
+        const localX = pos.getX(i); // -w/2..w/2
+        const worldX = z.x0 + w/2 + localX;
+        pos.setZ(i, slopeHeightAt(worldX, z.x0, z.x1)); // plane in XY before rotation; Z becomes height
+      }
+      geo.computeVertexNormals();
+      const mat = new THREE.MeshStandardMaterial({color:0x565a52, roughness:0.85});
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.rotation.x = -Math.PI/2;
+      mesh.position.set(z.x0+w/2, 0, 0);
+      mesh.receiveShadow = true; mesh.castShadow = true;
+      terrainRoot.add(mesh); terrainMeshes.push(mesh);
+    } else if(z.type==='sand'){
+      const geo = new THREE.PlaneGeometry(w, TRACK_HALF_WIDTH*2, 20, 6);
+      const pos = geo.attributes.position;
+      for(let i=0;i<pos.count;i++){ pos.setZ(i, -0.06 - Math.random()*0.03); }
+      geo.computeVertexNormals();
+      const mat = new THREE.MeshStandardMaterial({color:0xc7a15c, roughness:1.0});
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.rotation.x = -Math.PI/2;
+      mesh.position.set(z.x0+w/2, 0.001, 0);
+      mesh.receiveShadow = true;
+      terrainRoot.add(mesh); terrainMeshes.push(mesh);
+    } else if(z.type==='gravel'){
+      const geo = new THREE.PlaneGeometry(w, TRACK_HALF_WIDTH*2, 16, 4);
+      const mat = new THREE.MeshStandardMaterial({color:0x6b6b66, roughness:0.95});
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.rotation.x = -Math.PI/2;
+      mesh.position.set(z.x0+w/2, 0.001, 0);
+      mesh.receiveShadow = true;
+      terrainRoot.add(mesh); terrainMeshes.push(mesh);
+      const pebbleGeo = new THREE.IcosahedronGeometry(0.05,0);
+      const pebbleMat = new THREE.MeshStandardMaterial({color:0x83837c, roughness:0.9});
+      for(let i=0;i<70;i++){
+        const p = new THREE.Mesh(pebbleGeo, pebbleMat);
+        p.position.set(z.x0 + Math.random()*w, 0.02, (Math.random()-0.5)*TRACK_HALF_WIDTH*1.8);
+        p.scale.setScalar(0.6+Math.random()*0.8);
+        p.rotation.set(Math.random()*6,Math.random()*6,Math.random()*6);
+        p.receiveShadow = true; p.castShadow = true;
+        terrainRoot.add(p); gravelBits.push(p);
+      }
+    }
+  });
+
+  // path guide markers (dashed centerline)
+  for(let x=TRACK_START; x<=TRACK_TARGET; x+=1.5){
+    const dash = new THREE.Mesh(new THREE.PlaneGeometry(0.5,0.06), new THREE.MeshBasicMaterial({color:0x4fb7e8, transparent:true, opacity:0.35}));
+    dash.rotation.x = -Math.PI/2;
+    dash.position.set(x, terrainHeightAt(x)+0.01, 0);
+    terrainRoot.add(dash); terrainMeshes.push(dash);
+  }
+
+  targetFlagGroup.position.set(TRACK_TARGET, terrainHeightAt(TRACK_TARGET), 0);
+}
+
+/* ============================================================
+   CAMERA CONTROLS (custom orbit / zoom / pan)
+   ============================================================ */
+const camState = {radius:7.5, theta:0.9, phi:1.05, panOffset:new THREE.Vector3(0.6,1,0), followY:0, hopZoom:0};
+const camDefault = {radius:7.5, theta:0.9, phi:1.05};
+let dragging=false, dragButton=0, lastX=0, lastY=0, dragMoved=false;
+let pinchStartDist=0, pinchStartRadius=0;
+let touchLastMid=null;
+
+function clampPhi(p){ return Math.max(0.18, Math.min(1.52, p)); }
+
+function getVehicleFollowPoint(){
+  // followY lags behind the vehicle's actual height so a hop is visible on screen
+  // instead of being perfectly cancelled out by the camera rising with it.
+  return new THREE.Vector3(vehicle.position.x, camState.followY+0.4, vehicle.position.z).add(camState.panOffset);
+}
+
+function updateCameraFollow(dt){
+  const lagRate = (SIM.mode==='HOP_AIR' || SIM.mode==='HOP_CHARGE') ? 1.6 : 5.5;
+  camState.followY += (vehicle.position.y - camState.followY) * Math.min(1, lagRate*dt);
+
+  // cinematic pull-back while airborne so the whole arc stays in frame, eased in/out
+  const wantZoom = (SIM.mode==='HOP_CHARGE' || SIM.mode==='HOP_AIR' || SIM.mode==='HOP_SETTLE') ? 2.4 : 0;
+  camState.hopZoom += (wantZoom - camState.hopZoom) * Math.min(1, 3*dt);
+}
+
+function updateCameraPosition(){
+  const target = getVehicleFollowPoint();
+  const r = camState.radius + (dragging ? 0 : camState.hopZoom);
+  const x = r*Math.sin(camState.phi)*Math.sin(camState.theta);
+  const y = r*Math.cos(camState.phi);
+  const z = r*Math.sin(camState.phi)*Math.cos(camState.theta);
+  camera.position.set(target.x+x, target.y+y, target.z+z);
+  camera.lookAt(target);
+}
+
+function resetCamera(){
+  camState.radius = camDefault.radius; camState.theta = camDefault.theta; camState.phi = camDefault.phi;
+  camState.panOffset.set(0.6,1,0);
+}
+
+function setPresetView(name){
+  const presets = {
+    front: {theta:0, phi:1.15, radius:5.5},
+    rear:  {theta:Math.PI, phi:1.15, radius:5.5},
+    side:  {theta:Math.PI/2, phi:1.15, radius:5.5},
+    top:   {theta:0.9, phi:0.2, radius:6.5},
+    bottom:{theta:0.9, phi:2.6>1.52?1.5:1.5, radius:5.5}
+  };
+  const p = presets[name]; if(!p) return;
+  camState.theta=p.theta; camState.phi=clampPhi(p.phi); camState.radius=p.radius;
+}
+
+const canvas = renderer.domElement;
+canvas.addEventListener('contextmenu', e=>e.preventDefault());
+
+canvas.addEventListener('mousedown', (e)=>{
+  dragging = true; dragMoved=false; dragButton = e.button;
+  lastX = e.clientX; lastY = e.clientY;
+});
+window.addEventListener('mouseup', (e)=>{
+  if(dragging && !dragMoved){ handleClick(e.clientX, e.clientY); }
+  dragging = false;
+});
+window.addEventListener('mousemove', (e)=>{
+  if(!dragging) return;
+  const dx = e.clientX-lastX, dy = e.clientY-lastY;
+  if(Math.abs(dx)+Math.abs(dy) > 3) dragMoved = true;
+  lastX = e.clientX; lastY = e.clientY;
+  const isPan = dragButton===2 || e.shiftKey;
+  if(isPan){
+    const panSpeed = camState.radius*0.0013;
+    const right = new THREE.Vector3(Math.cos(camState.theta),0,-Math.sin(camState.theta));
+    const up = new THREE.Vector3(0,1,0);
+    camState.panOffset.addScaledVector(right, -dx*panSpeed);
+    camState.panOffset.addScaledVector(up, dy*panSpeed);
+  } else {
+    camState.theta -= dx*0.006;
+    camState.phi = clampPhi(camState.phi - dy*0.006);
+  }
+});
+canvas.addEventListener('wheel', (e)=>{
+  e.preventDefault();
+  camState.radius = Math.max(2.5, Math.min(28, camState.radius + e.deltaY*0.01));
+}, {passive:false});
+
+// touch support
+canvas.addEventListener('touchstart', (e)=>{
+  if(e.touches.length===1){
+    dragging = true; dragMoved=false;
+    lastX = e.touches[0].clientX; lastY = e.touches[0].clientY;
+  } else if(e.touches.length===2){
+    dragging = false;
+    const dx = e.touches[0].clientX-e.touches[1].clientX;
+    const dy = e.touches[0].clientY-e.touches[1].clientY;
+    pinchStartDist = Math.hypot(dx,dy);
+    pinchStartRadius = camState.radius;
+    touchLastMid = {x:(e.touches[0].clientX+e.touches[1].clientX)/2, y:(e.touches[0].clientY+e.touches[1].clientY)/2};
+  }
+}, {passive:true});
+canvas.addEventListener('touchmove', (e)=>{
+  if(e.touches.length===1 && dragging){
+    const t=e.touches[0];
+    const dx=t.clientX-lastX, dy=t.clientY-lastY;
+    if(Math.abs(dx)+Math.abs(dy) > 3) dragMoved = true;
+    lastX=t.clientX; lastY=t.clientY;
+    camState.theta -= dx*0.006;
+    camState.phi = clampPhi(camState.phi - dy*0.006);
+  } else if(e.touches.length===2){
+    const dx = e.touches[0].clientX-e.touches[1].clientX;
+    const dy = e.touches[0].clientY-e.touches[1].clientY;
+    const dist = Math.hypot(dx,dy);
+    camState.radius = Math.max(2.5, Math.min(28, pinchStartRadius * (pinchStartDist/Math.max(dist,1))));
+    const mid = {x:(e.touches[0].clientX+e.touches[1].clientX)/2, y:(e.touches[0].clientY+e.touches[1].clientY)/2};
+    if(touchLastMid){
+      const dmx = mid.x-touchLastMid.x, dmy = mid.y-touchLastMid.y;
+      const panSpeed = camState.radius*0.0016;
+      const right = new THREE.Vector3(Math.cos(camState.theta),0,-Math.sin(camState.theta));
+      const up = new THREE.Vector3(0,1,0);
+      camState.panOffset.addScaledVector(right, -dmx*panSpeed);
+      camState.panOffset.addScaledVector(up, dmy*panSpeed);
+    }
+    touchLastMid = mid;
+  }
+}, {passive:true});
+canvas.addEventListener('touchend', (e)=>{
+  if(e.touches.length===0){
+    dragging=false; touchLastMid=null;
+  }
+});
+
+/* ============================================================
+   COMPONENT INSPECTION (raycast)
+   ============================================================ */
+const raycaster = new THREE.Raycaster();
+const mouseNDC = new THREE.Vector2();
+const tipEl = document.getElementById('component-tip');
+const tipTitle = document.getElementById('tip-title');
+const tipDesc = document.getElementById('tip-desc');
+let highlightMesh = null;
+const HIGHLIGHT_EMISSIVE = new THREE.Color(0x4fb7e8);
+
+function handleClick(clientX, clientY){
+  const rect = canvas.getBoundingClientRect();
+  mouseNDC.x = ((clientX-rect.left)/rect.width)*2-1;
+  mouseNDC.y = -((clientY-rect.top)/rect.height)*2+1;
+  raycaster.setFromCamera(mouseNDC, camera);
+  const hits = raycaster.intersectObjects(interactiveMeshes, false);
+  if(highlightMesh){ highlightMesh = null; }
+  if(hits.length){
+    const mesh = hits[0].object;
+    const id = mesh.userData.componentId;
+    const info = COMPONENT_INFO[id];
+    if(info){
+      tipTitle.textContent = info.title;
+      tipDesc.textContent = info.desc;
+      tipEl.style.left = Math.min(clientX+14, window.innerWidth-250)+'px';
+      tipEl.style.top = Math.min(clientY+14, window.innerHeight-100)+'px';
+      tipEl.style.display = 'block';
+    }
+  } else {
+    tipEl.style.display = 'none';
+  }
+}
+window.addEventListener('keydown', (e)=>{ if(e.key==='Escape') tipEl.style.display='none'; });
+
+/* ============================================================
+   SIMULATION STATE
+   ============================================================ */
+const SIM = {
+  running:false, paused:false,
+  x: TRACK_START, y:0, heading:0,
+  vx:0, vy:0,
+  wheelAngVel:0, wheelAngle:0,
+  slip:0, motorLoad:0, motorLoadLabel:'LOW',
+  progressBuf:[], progressRate:1,
+  energy:100,
+  mode:'DRIVE', // DRIVE | HOP_CHARGE | HOP_AIR | HOP_SETTLE | DONE
+  squash:new THREE.Vector3(1,1,1),
+  hopTimer:0,
+  stuckCounter:0, adjustCounter:0,
+  tractionMultiplier:1.0, tractionTimer:0,
+  repositionTimer:0,
+  decisionAccum:0,
+  simClock:0,
+  lastAction:'Continue Rolling',
+  missionStage: 0 // 0 start,1 in difficult terrain,2 recovery,3 target
+};
+
+const TRACTION = {firm:0.95, slope:0.82, sand:0.32, gravel:0.55};
+const MAX_WHEEL_SPEED = 6.2; // rad/s
+const WHEEL_ACCEL = 3.0;
+const DECISION_INTERVAL = 1.0; // seconds
+
+function resetSim(terrainMode){
+  SIM.x = TRACK_START; SIM.y = 0; SIM.vx=0; SIM.vy=0;
+  SIM.wheelAngVel=0; SIM.wheelAngle=0;
+  SIM.slip=0; SIM.motorLoad=0; SIM.motorLoadLabel='LOW';
+  SIM.progressBuf=[]; SIM.progressRate=1;
+  SIM.energy=100;
+  SIM.mode='DRIVE'; SIM.hopTimer=0;
+  SIM.stuckCounter=0; SIM.adjustCounter=0;
+  SIM.tractionMultiplier=1.0; SIM.tractionTimer=0; SIM.repositionTimer=0;
+  SIM.decisionAccum=0; SIM.simClock=0;
+  SIM.lastAction='Continue Rolling';
+  SIM.missionStage=0;
+  buildTerrain(terrainMode);
+  vehicle.position.set(SIM.x, terrainHeightAt(SIM.x)+0.0, 0);
+  vehicle.rotation.set(0,0,0);
+  vehicle.scale.set(1,1,1);
+  camState.followY = terrainHeightAt(SIM.x);
+  camState.hopZoom = 0;
+  document.getElementById('decision-log').innerHTML='';
+  updateMissionUI();
+  hideBanner();
+  logDecision('SYSTEM READY — awaiting START');
+}
+
+/* ============================================================
+   HELIOS DECISION LOGIC
+   ============================================================ */
+function logDecision(msg){
+  const log = document.getElementById('decision-log');
+  const t = SIM.simClock.toFixed(1);
+  const row = document.createElement('div');
+  row.innerHTML = '<span class="t">['+t+'s]</span> '+msg;
+  log.insertBefore(row, log.firstChild);
+  while(log.children.length>10) log.removeChild(log.lastChild);
+}
+
+function computeEstimatedOutcomes(state){
+  const zoneType = getZoneAt(SIM.x).type;
+  const outcomes = {};
+  if(state==='NORMAL'){
+    outcomes.roll = "Maintains steady forward progress.";
+    outcomes.reposition = "Unnecessary — mobility is nominal.";
+    outcomes.traction = "No benefit — slip is already low.";
+    outcomes.hop = "Not warranted — wheels are effective here.";
+  } else if(state==='DEGRADED'){
+    outcomes.roll = "Continued progress, but slower than commanded.";
+    outcomes.reposition = "Small heading change may find firmer ground.";
+    outcomes.traction = zoneType==='gravel' ? "Lower wheel torque should cut slip and restore progress." : "Limited effect — terrain is uniformly soft.";
+    outcomes.hop = "Would clear the obstacle, but not yet justified.";
+  } else { // STUCK
+    outcomes.roll = "No further progress expected — wheels spinning in place.";
+    outcomes.reposition = "Unlikely to recover — already attempted.";
+    outcomes.traction = "Insufficient — slip is too severe to correct by torque alone.";
+    outcomes.hop = "Bypasses the obstacle entirely, landing on firmer terrain ahead.";
+  }
+  return outcomes;
+}
+
+function renderActions(state, selected){
+  const outcomes = computeEstimatedOutcomes(state);
+  const list = [
+    {key:'roll', name:'Continue Rolling'},
+    {key:'reposition', name:'Reposition'},
+    {key:'traction', name:'Adjust Traction'},
+    {key:'hop', name:'Hop'}
+  ];
+  const el = document.getElementById('actions-list');
+  el.innerHTML = '';
+  list.forEach(a=>{
+    const row = document.createElement('div');
+    row.className = 'action-row' + (a.name===selected ? ' selected' : '');
+    row.innerHTML = '<div class="aname">'+a.name+'</div><div class="aoutcome">'+outcomes[a.key]+'</div>';
+    el.appendChild(row);
+  });
+}
+
+function heliosDecisionTick(){
+  if(SIM.mode!=='DRIVE') return;
+
+  // OBSERVE + ESTIMATE STATE
+  const slipPct = SIM.slip;
+  const progress = SIM.progressRate; // 0..1 relative to commanded
+  let mobilityState;
+  if(progress < 0.35 && slipPct > 0.5){
+    mobilityState = 'STUCK';
+    SIM.stuckCounter++;
+  } else if(progress < 0.65 || slipPct > 0.3){
+    mobilityState = 'DEGRADED';
+    SIM.stuckCounter = Math.max(0, SIM.stuckCounter-1);
+  } else {
+    mobilityState = 'NORMAL';
+    SIM.stuckCounter = 0; SIM.adjustCounter = 0;
+  }
+
+  // ASSESS MOBILITY + EVALUATE + SELECT ACTION
+  let selected = 'Continue Rolling';
+  const zoneType = getZoneAt(SIM.x).type;
+
+  if(mobilityState === 'NORMAL'){
+    selected = 'Continue Rolling';
+  } else if(mobilityState === 'DEGRADED'){
+    if(zoneType==='gravel' && SIM.adjustCounter < 2){
+      selected = 'Adjust Traction';
+      SIM.adjustCounter++;
+      SIM.tractionMultiplier = 0.68;
+      SIM.tractionTimer = 2.2;
+    } else if(SIM.stuckCounter >= 2){
+      selected = 'Continue Rolling'; // keep trying briefly before escalating
+    } else {
+      selected = 'Reposition';
+      SIM.repositionTimer = 0.6;
+    }
+  } else { // STUCK
+    if(SIM.stuckCounter >= 3){
+      selected = 'Hop';
+    } else {
+      selected = 'Reposition';
+      SIM.repositionTimer = 0.6;
+    }
+  }
+
+  logDecision('OBSERVE \u2192 ESTIMATE ('+mobilityState+') \u2192 ASSESS \u2192 SELECT: '+selected);
+  SIM.lastAction = selected;
+  renderActions(mobilityState, selected);
+  updateMobilityBadge(mobilityState);
+
+  if(selected==='Hop'){
+    startHop();
+  }
+
+  if(SIM.missionStage===0 && mobilityState!=='NORMAL'){
+    SIM.missionStage = 1;
+    updateMissionUI();
+  }
+}
+
+function startHop(){
+  SIM.mode = 'HOP_CHARGE';
+  SIM.hopTimer = 0;
+  logDecision('HOP SELECTED \u2014 stopping wheels, charging energy storage');
+  SIM.missionStage = 2;
+  updateMissionUI();
+}
+
+/* ============================================================
+   PHYSICS UPDATE
+   ============================================================ */
+const GRAVITY = 9.8;
+const HOP_CHARGE_TIME = 1.0;
+const HOP_VX = 6.6, HOP_VY = 6.4;
+
+function updatePhysics(dt){
+  SIM.simClock += dt;
+
+  if(SIM.mode === 'DRIVE'){
+    const zone = getZoneAt(SIM.x);
+    const traction = TRACTION[zone.type] * SIM.tractionMultiplier;
+
+    if(SIM.tractionTimer>0){ SIM.tractionTimer -= dt; if(SIM.tractionTimer<=0) SIM.tractionMultiplier=1.0; }
+
+    let commandedSpeed = MAX_WHEEL_SPEED;
+    if(SIM.repositionTimer>0){
+      SIM.repositionTimer -= dt;
+      commandedSpeed = MAX_WHEEL_SPEED*0.4; // brief cautious crawl while repositioning
+    }
+    SIM.wheelAngVel += (commandedSpeed - SIM.wheelAngVel) * Math.min(1, WHEEL_ACCEL*dt);
+    SIM.wheelAngle += SIM.wheelAngVel*dt;
+
+    const wheelSurfaceSpeed = SIM.wheelAngVel * WHEEL_R;
+    let grade = 0;
+    if(zone.type==='slope'){
+      const h1 = terrainHeightAt(SIM.x+0.3), h0 = terrainHeightAt(SIM.x-0.3);
+      grade = THREE.MathUtils.clamp((h1-h0)/0.6, -1, 1);
+    }
+    const slopeResist = Math.max(0, grade)*0.55;
+    const slip = THREE.MathUtils.clamp((1-traction) + slopeResist*0.15 + (Math.random()-0.5)*0.03, 0, 0.95);
+    const vehicleSpeed = Math.max(0, wheelSurfaceSpeed*(1-slip));
+
+    SIM.slip = slip;
+    const loadRaw = THREE.MathUtils.clamp(slopeResist*0.7 + slip*0.65 + 0.15, 0, 1.3);
+    SIM.motorLoad = loadRaw;
+    SIM.motorLoadLabel = loadRaw>0.75 ? 'HIGH' : loadRaw>0.42 ? 'MEDIUM' : 'LOW';
+
+    SIM.x += vehicleSpeed*dt;
+    const targetY = terrainHeightAt(SIM.x);
+    SIM.y += (targetY - SIM.y) * Math.min(1, 8*dt);
+    if(zone.type==='sand'){ SIM.y -= 0.04*slip; } // visual sink in soft sand
+
+    SIM.progressBuf.push(vehicleSpeed/(MAX_WHEEL_SPEED*WHEEL_R)); // actual ground speed vs. max possible ground speed
+    if(SIM.progressBuf.length>40) SIM.progressBuf.shift();
+    const avg = SIM.progressBuf.reduce((a,b)=>a+b,0)/SIM.progressBuf.length;
+    SIM.progressRate = THREE.MathUtils.clamp(avg, 0, 1);
+
+    SIM.energy = Math.min(100, SIM.energy + dt*1.2);
+
+    vehicle.position.set(SIM.x, SIM.y + WHEEL_R, 0);
+    vehicle.rotation.z = 0;
+    vehicle.rotation.x = 0;
+    const pitch = zone.type==='slope' ? THREE.MathUtils.clamp(grade*0.28,-0.35,0.35) : 0;
+    vehicle.rotation.z = pitch;
+
+    Object.values(wheelGroups).forEach(w=>{ w.mesh.rotation.x = SIM.wheelAngle; });
+
+    if(SIM.x >= TRACK_TARGET){
+      SIM.mode = 'DONE';
+      SIM.missionStage = 3;
+      updateMissionUI();
+      showBanner('TARGET REACHED — MISSION COMPLETE ✓');
+    }
+
+  } else if(SIM.mode === 'HOP_CHARGE'){
+    SIM.hopTimer += dt;
+    Object.values(wheelGroups).forEach(w=>{}); // wheels frozen
+    const t = Math.min(1, SIM.hopTimer/HOP_CHARGE_TIME);
+    hopSpring.scale.y = 1 - t*0.45;
+    hopSpring.position.y = 0.16 - t*0.05;
+    SIM.energy = Math.max(10, SIM.energy - dt*18);
+    // crouch down and widen before the jump, like a coiling spring
+    SIM.squash.set(1+0.12*t, 1-0.24*t, 1+0.12*t);
+    if(t>=1){
+      SIM.mode = 'HOP_AIR';
+      SIM.vx = HOP_VX; SIM.vy = HOP_VY;
+      SIM.squash.set(0.8, 1.4, 0.8); // stretch upward at the moment of launch
+      spawnDust(SIM.x, terrainHeightAt(SIM.x), 0, 10);
+      logDecision('ENERGY RELEASED \u2014 vehicle launched');
+      showBanner('HOP INITIATED — CLEARING OBSTACLE');
+    }
+
+  } else if(SIM.mode === 'HOP_AIR'){
+    SIM.vy -= GRAVITY*dt;
+    SIM.x += SIM.vx*dt;
+    SIM.y += SIM.vy*dt;
+    vehicle.position.set(SIM.x, SIM.y + WHEEL_R, 0);
+    vehicle.rotation.z = THREE.MathUtils.clamp(SIM.vy*0.09, -0.5, 0.6);
+    Object.values(wheelGroups).forEach(w=>{ w.mesh.rotation.x += dt*14; });
+    hopSpring.scale.y = THREE.MathUtils.lerp(hopSpring.scale.y, 1, 0.08);
+    hopSpring.position.y = THREE.MathUtils.lerp(hopSpring.position.y, 0.16, 0.08);
+
+    const groundY = terrainHeightAt(SIM.x);
+    if(SIM.y <= groundY){
+      SIM.y = groundY;
+      SIM.mode = 'HOP_SETTLE';
+      SIM.hopTimer = 0;
+      vehicle.rotation.z = 0;
+      SIM.squash.set(1.28, 0.68, 1.28); // squash flat on impact
+      spawnDust(SIM.x, groundY, 0, 12);
+      logDecision('LANDED \u2014 sensors reassessing mobility state');
+    }
+    if(SIM.x >= TRACK_TARGET){
+      SIM.mode = 'DONE';
+      SIM.missionStage = 3;
+      updateMissionUI();
+      showBanner('TARGET REACHED — MISSION COMPLETE ✓');
+    }
+
+  } else if(SIM.mode === 'HOP_SETTLE'){
+    SIM.hopTimer += dt;
+    vehicle.position.set(SIM.x, terrainHeightAt(SIM.x) + WHEEL_R, 0);
+    if(SIM.hopTimer > 0.5){
+      SIM.mode = 'DRIVE';
+      SIM.stuckCounter = 0; SIM.adjustCounter = 0; SIM.progressBuf = [];
+      SIM.missionStage = 2;
+      updateMissionUI();
+      showBanner('MOBILITY RESTORED ✓  MISSION CONTINUING ✓', true);
+      logDecision('MOBILITY RESTORED \u2014 resuming mission toward target');
+    }
+  }
+
+  if(SIM.mode !== 'HOP_CHARGE'){
+    SIM.squash.lerp(DUST_ONE, Math.min(1, 5*dt));
+  }
+  vehicle.scale.copy(SIM.squash);
+
+  updateDust(dt);
+  updateWheelSlipVisual();
+  updateForcesVisual();
+  updateHopBadge();
+  updateHUD();
+}
+
+/* ============================================================
+   UI helpers
+   ============================================================ */
+function updateMobilityBadge(state){
+  const badge = document.getElementById('mobility-badge');
+  badge.className = 'badge-'+state;
+  badge.textContent = 'MOBILITY: '+state;
+}
+function updateHopBadge(){
+  const badge = document.getElementById('mobility-badge');
+  const labels = {HOP_CHARGE:'CHARGING HOP', HOP_AIR:'AIRBORNE', HOP_SETTLE:'LANDING'};
+  if(labels[SIM.mode]){
+    badge.className = 'badge-HOPPING';
+    badge.textContent = 'MOBILITY: '+labels[SIM.mode];
+  }
+}
+function updateMissionUI(){
+  const steps = ['ms-start','ms-terrain','ms-recovery','ms-target'];
+  steps.forEach((id,i)=>{
+    const el = document.getElementById(id);
+    el.classList.remove('active','done');
+    if(i < SIM.missionStage) el.classList.add('done');
+    else if(i === SIM.missionStage) el.classList.add('active');
+  });
+}
+let bannerTimer=null;
+function showBanner(text, ok){
+  const b = document.getElementById('banner');
+  b.textContent = text;
+  b.className = 'panel show' + (ok?' ok':'');
+  clearTimeout(bannerTimer);
+  bannerTimer = setTimeout(hideBanner, 2600);
+}
+function hideBanner(){ document.getElementById('banner').classList.remove('show'); }
+
+function updateHUD(){
+  document.getElementById('m-vel').textContent = (SIM.mode==='DRIVE' ? (SIM.wheelAngVel*WHEEL_R*(1-SIM.slip)).toFixed(2) : Math.hypot(SIM.vx,SIM.vy).toFixed(2)) + ' m/s';
+  document.getElementById('m-slip').textContent = Math.round(SIM.slip*100)+'%';
+  document.getElementById('m-load').textContent = SIM.motorLoadLabel;
+  document.getElementById('m-load').style.color = SIM.motorLoadLabel==='HIGH' ? 'var(--bad)' : SIM.motorLoadLabel==='MEDIUM' ? 'var(--warn)' : 'var(--ok)';
+  document.getElementById('m-progress').textContent = SIM.progressRate>0.6 ? 'NORMAL' : SIM.progressRate>0.28 ? 'LOW' : 'MINIMAL';
+  document.getElementById('m-energy').textContent = Math.round(SIM.energy)+'%';
+
+  document.getElementById('s-w1').textContent = SIM.wheelAngVel.toFixed(1)+' / '+SIM.wheelAngVel.toFixed(1)+' rad/s';
+  document.getElementById('s-w2').textContent = SIM.wheelAngVel.toFixed(1)+' / '+SIM.wheelAngVel.toFixed(1)+' rad/s';
+  document.getElementById('s-pitch').textContent = (vehicle.rotation.z*57.3).toFixed(1)+'°';
+  document.getElementById('s-accel').textContent = (SIM.mode==='HOP_AIR' ? (SIM.vy/GRAVITY) : 1.0).toFixed(2)+' g';
+  document.getElementById('s-zone').textContent = getZoneAt(SIM.x).type;
+}
+
+/* wheel slip visual (tint) */
+function updateWheelSlipVisual(){
+  const show = document.getElementById('dbg-slip').checked;
+  Object.values(wheelGroups).forEach(w=>{
+    if(show){
+      const c = new THREE.Color().lerpColors(new THREE.Color(0x181b1e), new THREE.Color(0xe05c5c), Math.min(1,SIM.slip*1.3));
+      w.mesh.material.color.copy(c);
+    } else {
+      w.mesh.material.color.set(0x181b1e);
+    }
+  });
+}
+
+/* forces visual (arrow helpers) */
+let velArrow=null, slipArrow=null;
+function ensureArrows(){
+  if(!velArrow){
+    velArrow = new THREE.ArrowHelper(new THREE.Vector3(1,0,0), new THREE.Vector3(), 1, 0x4fb7e8, 0.15, 0.08);
+    scene.add(velArrow);
+  }
+  if(!slipArrow){
+    slipArrow = new THREE.ArrowHelper(new THREE.Vector3(0,1,0), new THREE.Vector3(), 1, 0xe05c5c, 0.12, 0.07);
+    scene.add(slipArrow);
+  }
+}
+function updateForcesVisual(){
+  const show = document.getElementById('dbg-forces').checked;
+  if(!show){
+    if(velArrow) velArrow.visible=false;
+    if(slipArrow) slipArrow.visible=false;
+    return;
+  }
+  ensureArrows();
+  velArrow.visible = true; slipArrow.visible = true;
+  const origin = vehicle.position.clone(); origin.y += 0.9;
+  velArrow.position.copy(origin);
+  const speed = SIM.mode==='DRIVE' ? SIM.wheelAngVel*WHEEL_R*(1-SIM.slip) : Math.hypot(SIM.vx,SIM.vy);
+  velArrow.setLength(0.3+speed*0.5, 0.15, 0.08);
+  velArrow.setDirection(new THREE.Vector3(1,0,0));
+  slipArrow.position.copy(origin).add(new THREE.Vector3(0,0.3,0));
+  slipArrow.setLength(0.2+SIM.slip*1.2, 0.12, 0.07);
+  slipArrow.setDirection(new THREE.Vector3(0,1,0));
+}
+
+/* ============================================================
+   CONTROLS WIRING
+   ============================================================ */
+let currentTerrain = 'normal';
+
+document.querySelectorAll('.terrain-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.terrain-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    currentTerrain = btn.dataset.terrain;
+    resetSim(currentTerrain);
+    SIM.running=false; SIM.paused=false;
+    document.getElementById('btn-start').textContent='START';
+  });
+});
+
+document.getElementById('btn-start').addEventListener('click', ()=>{
+  if(!SIM.running){ SIM.running = true; SIM.paused=false; document.getElementById('btn-start').textContent='RUNNING'; logDecision('SIMULATION STARTED'); }
+  else { SIM.paused=false; document.getElementById('btn-start').textContent='RUNNING'; }
+});
+document.getElementById('btn-pause').addEventListener('click', ()=>{
+  if(SIM.running){ SIM.paused = !SIM.paused; document.getElementById('btn-pause').textContent = SIM.paused?'RESUME':'PAUSE'; }
+});
+document.getElementById('btn-reset').addEventListener('click', ()=>{
+  SIM.running=false; SIM.paused=false;
+  document.getElementById('btn-start').textContent='START';
+  document.getElementById('btn-pause').textContent='PAUSE';
+  resetSim(currentTerrain);
+});
+document.getElementById('btn-cam-reset').addEventListener('click', resetCamera);
+document.querySelectorAll('#camera-panel [data-view]').forEach(btn=>{
+  btn.addEventListener('click', ()=>setPresetView(btn.dataset.view));
+});
+
+document.getElementById('dbg-sensors').addEventListener('change', (e)=>{
+  document.getElementById('sensors-panel').style.display = e.target.checked?'block':'none';
+  e.target.closest('.dbg-toggle').classList.toggle('on', e.target.checked);
+});
+document.getElementById('dbg-helios').addEventListener('change', (e)=>{
+  document.getElementById('mobility-panel').style.display = e.target.checked?'block':'none';
+  e.target.closest('.dbg-toggle').classList.toggle('on', e.target.checked);
+});
+document.getElementById('dbg-decision').addEventListener('change', (e)=>{
+  document.getElementById('decision-panel').style.display = e.target.checked?'block':'none';
+  e.target.closest('.dbg-toggle').classList.toggle('on', e.target.checked);
+});
+['dbg-forces','dbg-slip'].forEach(id=>{
+  document.getElementById(id).addEventListener('change', (e)=>{
+    e.target.closest('.dbg-toggle').classList.toggle('on', e.target.checked);
+  });
+});
+document.getElementById('mission-strip').style.display='block';
+
+/* ============================================================
+   MAIN LOOP
+   ============================================================ */
+const clock = new THREE.Clock();
+function animate(){
+  requestAnimationFrame(animate);
+  const dt = Math.min(0.05, clock.getDelta());
+
+  if(SIM.running && !SIM.paused){
+    SIM.decisionAccum += dt;
+    updatePhysics(dt);
+    if(SIM.decisionAccum >= DECISION_INTERVAL){
+      SIM.decisionAccum = 0;
+      heliosDecisionTick();
+    }
+  }
+
+  updateCameraFollow(dt);
+  updateCameraPosition();
+  renderer.render(scene, camera);
+}
+
+window.addEventListener('resize', ()=>{
+  camera.aspect = window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+resetSim(currentTerrain);
+renderActions('NORMAL','Continue Rolling');
+animate();
+
+})();
+</script>
+</body>
+</html>
